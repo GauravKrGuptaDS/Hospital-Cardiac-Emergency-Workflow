@@ -27,11 +27,13 @@ st.markdown(
 # -----------------------------
 client = OpenAI(
     api_key=st.secrets["OPENAI_API_KEY"]
+    #api_key=""
 )
 
 # -----------------------------
 # SESSION STATE INITIALIZATION
 # -----------------------------
+
 if "patient" not in st.session_state:
     st.session_state.patient = {}
 
@@ -55,6 +57,19 @@ if "insurance_summary" not in st.session_state:
 
 if "followup_message" not in st.session_state:
     st.session_state.followup_message = ""
+
+if "step_completed" not in st.session_state:
+    st.session_state.step_completed = {
+        "Casualty": False,
+        "Smart Triage": False,
+        "Doctor Consultation": False,
+        "ECG": False,
+        "Cardiologist Alert": False,
+        "ICU": False,
+        "Discharge": False,
+        "Insurance": False,
+        "Follow-Up": False
+    }
 
 # -----------------------------
 # HELPER FUNCTION
@@ -96,40 +111,58 @@ workflow_steps = [
     "Follow-Up"
 ]
 
-completed_steps = []
+completed_steps = [
+    step
+    for step, completed
+    in st.session_state.step_completed.items()
+    if completed
+]
 
-if st.session_state.patient:
-    completed_steps.append("Casualty")
+# ---------------------------------
+# CLEAN STATUS BAR UI
+# ---------------------------------
 
-if st.session_state.triage_result:
-    completed_steps.append("Smart Triage")
+status_html = ""
 
-if st.session_state.consultation_summary:
-    completed_steps.append("Doctor Consultation")
+for step in workflow_steps:
 
-if st.session_state.ecg_result:
-    completed_steps.append("ECG")
-    completed_steps.append("Cardiologist Alert")
-
-if st.session_state.icu_medications:
-    completed_steps.append("ICU")
-
-if st.session_state.discharge_summary:
-    completed_steps.append("Discharge")
-
-if st.session_state.insurance_summary:
-    completed_steps.append("Insurance")
-
-if st.session_state.followup_message:
-    completed_steps.append("Follow-Up")
-
-cols = st.columns(len(workflow_steps))
-
-for i, step in enumerate(workflow_steps):
     if step in completed_steps:
-        cols[i].success(step)
+        bg_color = "#d4edda"
+        border_color = "#28a745"
     else:
-        cols[i].info(step)
+        bg_color = "#e9ecef"
+        border_color = "#adb5bd"
+
+    status_html += f"""
+    <div style="
+        min-width:180px;
+        padding:15px;
+        margin-right:12px;
+        border-radius:12px;
+        border:2px solid {border_color};
+        background-color:{bg_color};
+        text-align:center;
+        font-size:20px;
+        font-weight:600;
+        white-space: nowrap;
+        display:inline-block;
+    ">
+        {step}
+    </div>
+    """
+
+st.markdown(
+    f"""
+    <div style="
+        overflow-x:auto;
+        white-space: nowrap;
+        padding-bottom:10px;
+    ">
+        {status_html}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 st.divider()
 
@@ -243,6 +276,8 @@ with st.expander("Patient Registration", expanded=True):
             "registration_time":
                 str(datetime.now())
         }
+
+        st.session_state.step_completed["Casualty"] = True
 
         st.success(
             "Patient Registered Successfully!"
@@ -379,6 +414,7 @@ if st.session_state.patient:
             result = call_gpt(prompt)
 
             st.session_state.triage_result = result
+            st.session_state.step_completed["Smart Triage"] = True
 
 # =====================================================
 # DISPLAY TRIAGE RESULT
@@ -493,6 +529,7 @@ ECG recommended immediately.
             result = call_gpt(prompt)
 
             st.session_state.consultation_summary = result
+            st.session_state.step_completed["Doctor Consultation"] = True
 
 # =====================================================
 # DISPLAY CONSULTATION SUMMARY
@@ -589,6 +626,8 @@ if st.session_state.consultation_summary:
             result = call_gpt(prompt)
 
             st.session_state.ecg_result = result
+            st.session_state.step_completed["ECG"] = True
+            st.session_state.step_completed["Cardiologist Alert"] = True
 
 # =====================================================
 # DISPLAY ECG RESULT
@@ -741,6 +780,7 @@ Metoprolol
             result = call_gpt(prompt)
 
             st.session_state.icu_medications = result
+            st.session_state.step_completed["ICU"] = True
 
 # =====================================================
 # DISPLAY ICU MEDICATION RESULT
@@ -890,6 +930,7 @@ Recommend cardiac follow-up.
             result = call_gpt(prompt)
 
             st.session_state.discharge_summary = result
+            st.session_state.step_completed["Discharge"] = True
 
 # =====================================================
 # DISPLAY DISCHARGE SUMMARY
@@ -1059,6 +1100,7 @@ if st.session_state.discharge_summary:
             result = call_gpt(prompt)
 
             st.session_state.insurance_summary = result
+            st.session_state.step_completed["Insurance"] = True
 
 # =====================================================
 # DISPLAY INSURANCE SUMMARY
@@ -1179,6 +1221,7 @@ if st.session_state.insurance_summary:
             result = call_gpt(prompt)
 
             st.session_state.followup_message = result
+            st.session_state.step_completed["Follow-Up"] = True
 
 # =====================================================
 # DISPLAY FOLLOW-UP RESULT
